@@ -1,134 +1,62 @@
 <!DOCTYPE html>
-<html lang="pt-br>
-
+<html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>IA do Zero</title>
-
+<title>🧠 IA Engine do Zero</title>
 <style>
-
-body{
-background:#121212;
-color:white;
-font-family:sans-serif;
-padding:40px;
-}
-
-.container{
-display:grid;
-grid-template-columns:1fr 1fr;
-gap:30px;
-}
-
-.card{
-background:#1e1e1e;
-padding:20px;
-border-radius:10px;
-}
-
-input{
-width:100%;
-padding:10px;
-margin-bottom:10px;
-background:#333;
-color:white;
-border:none;
-}
-
-button{
-width:100%;
-padding:10px;
-background:#0070f3;
-border:none;
-color:white;
-cursor:pointer;
-}
-
-#resultado{
-margin-top:20px;
-color:#0f0;
-font-weight:bold;
-}
-
+body{background:#121212;color:white;font-family:sans-serif;padding:40px;}
+.container{display:grid;grid-template-columns:1fr 1fr;gap:30px;}
+.card{background:#1e1e1e;padding:20px;border-radius:10px;}
+input, textarea{width:100%;padding:10px;margin-bottom:10px;background:#333;color:white;border:none;}
+button{width:100%;padding:10px;background:#0070f3;border:none;color:white;cursor:pointer;}
+#resultado{margin-top:20px;color:#0f0;font-weight:bold;}
 </style>
 </head>
-
 <body>
 
 <h1>🧠 IA Engine do Zero</h1>
 
 <div class="container">
-
 <div class="card">
-
 <h3>Treinar IA</h3>
-
 <input id="fraseTreino" placeholder="Frase">
-
 <input id="categoriaTreino" placeholder="Categoria">
-
 <button onclick="treinar()">Treinar</button>
-
 </div>
 
 <div class="card">
-
 <h3>Testar IA</h3>
-
 <input id="fraseTeste" placeholder="Digite algo">
-
 <button onclick="testar()">Testar</button>
-
 <div id="resultado"></div>
-
 </div>
-
 </div>
 
 <script>
-
 async function treinar(){
-
-const frase = document.getElementById("fraseTreino").value
-const categoria = document.getElementById("categoriaTreino").value
-
-await fetch("/api/train",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({frase,categoria})
-})
-
-alert("Treinado!")
-
+    const frase = document.getElementById("fraseTreino").value
+    const categoria = document.getElementById("categoriaTreino").value
+    await fetch("/api/train",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({frase,categoria})
+    })
+    alert("Treinado!")
 }
 
 async function testar(){
-
-const frase = document.getElementById("fraseTeste").value
-const resDiv = document.getElementById("resultado")
-
-resDiv.innerText = "Pensando..."
-
-const res = await fetch("/api/test",{
-method:"POST",
-headers:{
-"Content-Type":"application/json"
-},
-body:JSON.stringify({frase})
-})
-
-const data = await res.json()
-
-resDiv.innerHTML =
-"Intenção: "+data.intencao+
-"<br>Confiança: "+data.confianca
-
+    const frase = document.getElementById("fraseTeste").value
+    const resDiv = document.getElementById("resultado")
+    resDiv.innerText="Pensando..."
+    const res = await fetch("/api/test",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({frase})
+    })
+    const data = await res.json()
+    resDiv.innerHTML="Intenção: "+data.intencao+"<br>Confiança: "+data.confianca
 }
-
 </script>
 
 </body>
-
 </html>
