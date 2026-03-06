@@ -79,61 +79,46 @@ function prever(treinamento, frase) {
     return { intencao: melhor, confianca }
 }
 
-// ====== PESQUISA WEB (SISTEMA DE MULTI-INSTÂNCIAS) ======
+// ====== PESQUISA WEB (API WIKIPEDIA ESTÁVEL) ======
 async function pesquisarWeb(query) {
-    // Lista de instâncias públicas confiáveis (SearXNG)
-    const instancias = [
-        'searx.be',
-        'priv.au',
-        'searx.work',
-        'search.mdn.social'
-    ];
+    return new Promise((resolve) => {
+        // Usamos a API em português da Wikipedia. Ela retorna JSON limpo e nunca bloqueia.
+        const options = {
+            hostname: 'pt.wikipedia.org',
+            path: `/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'IA-Engine-Bot/1.0 (Node.js)'
+            }
+        };
 
-    for (const host of instancias) {
-        try {
-            const resultado = await new Promise((resolve, reject) => {
-                const options = {
-                    hostname: host,
-                    path: `/search?q=${encodeURIComponent(query)}&format=json`,
-                    method: 'GET',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        const req = https.get(options, res => {
+            let data = "";
+            res.on("data", chunk => data += chunk);
+            res.on("end", () => {
+                try {
+                    const json = JSON.parse(data);
+                    
+                    // Verifica se a busca trouxe resultados
+                    if (json.query && json.query.search && json.query.search.length > 0) {
+                        const titulo = json.query.search[0].title;
+                        // O 'snippet' vem com marcações HTML (ex: <span>), então limpamos elas
+                        let resumo = json.query.search[0].snippet.replace(/<[^>]+>/g, "");
+                        
+                        // Retorna de forma amigável
+                        resolve(`Segundo a Wikipédia sobre "${titulo}": ${resumo}...`);
+                    } else {
+                        resolve("Não encontrei informações factuais sobre isso na minha base de dados da enciclopédia.");
                     }
-                };
-
-                const req = https.get(options, res => {
-                    let data = "";
-                    res.on("data", chunk => data += chunk);
-                    res.on("end", () => {
-                        try {
-                            const json = JSON.parse(data);
-                            if (json.results && json.results.length > 0) {
-                                // Limpa tags HTML e retorna o conteúdo do primeiro resultado
-                                let resp = json.results[0].content.replace(/<[^>]+>/g, "");
-                                resolve(resp);
-                            } else {
-                                reject("Sem resultados");
-                            }
-                        } catch (e) {
-                            reject("JSON inválido");
-                        }
-                    });
-                });
-
-                req.on("error", (err) => reject(err));
-                req.setTimeout(4000, () => { req.destroy(); reject("Timeout"); });
+                } catch (e) {
+                    resolve("Busca concluída, mas não consegui ler o formato dos dados.");
+                }
             });
+        });
 
-            // Se chegou aqui, a pesquisa deu certo em uma das instâncias
-            return resultado.slice(0, 500);
-
-        } catch (erro) {
-            console.log(`[Aviso] Instância ${host} falhou, tentando próxima...`);
-            continue; // Pula para a próxima instância da lista
-        }
-    }
-
-    return "Não consegui encontrar uma resposta estável na internet no momento. Tente me treinar com essa informação.";
+        req.on("error", () => resolve("Sem conexão de rede no momento."));
+        req.setTimeout(5000, () => { req.destroy(); resolve("A pesquisa excedeu o tempo limite."); });
+    });
 }
 
 // ====== LÓGICA DE RESPOSTA ======
@@ -143,7 +128,7 @@ async function obterResposta(modelo, frase, pred) {
         return modelo.respostas[pred.intencao]["__default"] || "Sem resposta padrão.";
     }
 
-    // 2. Fallback: Se não tem certeza ou não tem treino, pesquisa na Web
+    // 2. Fallback: Pesquisa na Wikipedia
     return await pesquisarWeb(frase)
 }
 
