@@ -1,9 +1,12 @@
 {
-  "name": "ia-engine-zero",
+  "name": "ia-engine-aprendizado",
   "version": "1.0.0",
-  "description": "IA do zero sem libs",
+  "description": "IA com auto-aprendizado e DDG",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "dependencies": {
+    "ddg": "^0.1.3"
   }
 }
