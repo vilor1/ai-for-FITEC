@@ -1,12 +1,12 @@
 {
   "name": "ia-engine-aprendizado",
   "version": "1.0.0",
-  "description": "IA com auto-aprendizado e DDG",
+  "description": "IA com auto-aprendizado",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "ddg": "0.1.0"
+    "ddg": "latest"
   }
 }
