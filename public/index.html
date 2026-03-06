@@ -1,62 +1,218 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-<meta charset="UTF-8">
-<title>🧠 IA Avançada</title>
-<style>
-body{background:#111;color:white;font-family:sans-serif;padding:40px;}
-.card{background:#1e1e1e;padding:20px;margin-bottom:20px;border-radius:10px;}
-input,select{width:100%;padding:10px;margin-bottom:10px;background:#333;color:white;border:none;}
-button{width:100%;padding:10px;background:#0070f3;color:white;border:none;cursor:pointer;}
-#resultado{margin-top:20px;color:#0f0;font-weight:bold;white-space:pre-line;}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧠 IA Engine Avançada</title>
+    <style>
+        :root {
+            --bg: #0b0e14;
+            --card-bg: #161b22;
+            --primary: #0070f3;
+            --primary-hover: #005bc1;
+            --accent: #0f0;
+            --text: #e6edf3;
+            --input-bg: #0d1117;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(0, 112, 243, 0.3);
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 25px;
+            margin-bottom: 25px;
+            border-radius: 12px;
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        h3 {
+            margin-top: 0;
+            border-bottom: 1px solid #30363d;
+            padding-bottom: 10px;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            background: var(--input-bg);
+            color: white;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            transition: background 0.2s, opacity 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button:active {
+            opacity: 0.8;
+        }
+
+        #resultado {
+            margin-top: 20px;
+            padding: 15px;
+            background: #000;
+            border-left: 4px solid var(--accent);
+            color: var(--accent);
+            font-family: 'Courier New', Courier, monospace;
+            font-weight: bold;
+            white-space: pre-line;
+            border-radius: 4px;
+            display: none; /* Escondido até ter resposta */
+        }
+
+        .loading {
+            font-style: italic;
+            color: #8b949e;
+        }
+    </style>
 </head>
 <body>
-<h1>🧠 IA Engine Avançada</h1>
 
-<div class="card">
-<h3>Treinar IA</h3>
-<input id="fraseTreino" placeholder="Frase">
-<input id="categoriaTreino" placeholder="Categoria">
-<input id="respostaTreino" placeholder="Resposta padrão">
-<button onclick="treinar()">Treinar</button>
-</div>
+<div class="container">
+    <h1>🧠 IA Engine Avançada</h1>
 
-<div class="card">
-<h3>Testar IA</h3>
-<input id="fraseTeste" placeholder="Digite algo">
-<select id="modo">
-<option value="intencao">Modo Intenção</option>
-<option value="resposta">Modo Resposta</option>
-</select>
-<input id="userTeste" placeholder="Usuário (opcional)">
-<button onclick="testar()">Testar</button>
-<div id="resultado"></div>
+    <div class="card">
+        <h3>🛠️ Treinar IA</h3>
+        <input id="fraseTreino" placeholder="Frase (ex: qual seu nome?)" onkeypress="handleEnter(event, treinar)">
+        <input id="categoriaTreino" placeholder="Categoria (ex: identidade)">
+        <input id="respostaTreino" placeholder="Resposta padrão (ex: Meu nome é Gemini)">
+        <button id="btnTreinar" onclick="treinar()">Treinar Modelo</button>
+    </div>
+
+    <div class="card">
+        <h3>🧪 Testar IA</h3>
+        <input id="fraseTeste" placeholder="Digite sua pergunta..." onkeypress="handleEnter(event, testar)">
+        <select id="modo">
+            <option value="resposta">💬 Modo Resposta (Completo)</option>
+            <option value="intencao">🔍 Modo Intenção (Debug)</option>
+        </select>
+        <input id="userTeste" placeholder="Nome do usuário (opcional)">
+        <button id="btnTestar" onclick="testar()">Perguntar à IA</button>
+        <div id="resultado"></div>
+    </div>
 </div>
 
 <script>
-async function treinar(){
-    const frase=document.getElementById("fraseTreino").value
-    const categoria=document.getElementById("categoriaTreino").value
-    const resposta=document.getElementById("respostaTreino").value
-    if(!frase||!categoria){alert("Preencha frase e categoria");return}
-    await fetch("/api/train",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({frase,categoria,resposta})})
-    alert("Treinado com sucesso!")
-}
+    // Atalho para apertar Enter nos inputs
+    function handleEnter(event, func) {
+        if (event.key === "Enter") func();
+    }
 
-async function testar(){
-    const frase=document.getElementById("fraseTeste").value
-    const modo=document.getElementById("modo").value
-    const user=document.getElementById("userTeste").value||"anon"
-    const resDiv=document.getElementById("resultado")
-    if(!frase){resDiv.innerText="Digite algo";return}
-    resDiv.innerText="Pensando..."
-    const res=await fetch("/api/test",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({frase,modo,user})})
-    const data=await res.json()
-    let texto=`📝 Intenção: ${data.intencao}\n⚡ Confiança: ${data.confianca}`
-    if(modo==="resposta"){texto+=`\n💬 Resposta: ${data.resposta}`}
-    resDiv.innerText=texto
-}
+    async function treinar(){
+        const frase = document.getElementById("fraseTreino").value;
+        const categoria = document.getElementById("categoriaTreino").value;
+        const resposta = document.getElementById("respostaTreino").value;
+        const btn = document.getElementById("btnTreinar");
+
+        if(!frase || !categoria){
+            alert("⚠️ Preencha pelo menos a frase e a categoria!");
+            return;
+        }
+
+        btn.innerText = "Treinando...";
+        btn.disabled = true;
+
+        try {
+            await fetch("/api/train", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({frase, categoria, resposta})
+            });
+            
+            alert("✅ IA atualizada com sucesso!");
+            // Limpa campos
+            document.getElementById("fraseTreino").value = "";
+            document.getElementById("categoriaTreino").value = "";
+            document.getElementById("respostaTreino").value = "";
+        } catch (e) {
+            alert("❌ Erro ao conectar com o servidor.");
+        } finally {
+            btn.innerText = "Treinar Modelo";
+            btn.disabled = false;
+        }
+    }
+
+    async function testar(){
+        const frase = document.getElementById("fraseTeste").value;
+        const modo = document.getElementById("modo").value;
+        const user = document.getElementById("userTeste").value || "anon";
+        const resDiv = document.getElementById("resultado");
+        const btn = document.getElementById("btnTestar");
+
+        if(!frase){
+            resDiv.style.display = "block";
+            resDiv.innerText = "⚠️ Digite algo para testar.";
+            return;
+        }
+
+        resDiv.style.display = "block";
+        resDiv.innerHTML = '<span class="loading">🤔 Pensando...</span>';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch("/api/test", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({frase, modo, user})
+            });
+            const data = await res.json();
+
+            let texto = `📝 INTENÇÃO: ${data.intencao}\n⚡ CONFIANÇA: ${data.confianca}%`;
+            if(modo === "resposta"){
+                texto += `\n\n💬 RESPOSTA:\n${data.resposta}`;
+            }
+            resDiv.innerText = texto;
+        } catch (e) {
+            resDiv.innerText = "❌ Erro ao obter resposta.";
+        } finally {
+            btn.disabled = false;
+        }
+    }
 </script>
 
 </body>
