@@ -1,0 +1,9 @@
+{
+  "name": "ia-engine-zero",
+  "version": "1.0.0",
+  "description": "IA do zero sem libs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
