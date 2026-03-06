@@ -1,34 +1,34 @@
-const http = require("http")
-const https = require("https")
-const fs = require("fs")
-const path = require("path")
+const http = require("http");
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3000;
 
 // Configuração de Diretórios e Arquivos
-const DATA_DIR = path.join(__dirname, "data")
-const PUBLIC_DIR = path.join(__dirname, "public")
+const DATA_DIR = path.join(__dirname, "data");
+const PUBLIC_DIR = path.join(__dirname, "public");
 
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR)
-if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR)
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+if (!fs.existsSync(PUBLIC_DIR)) fs.mkdirSync(PUBLIC_DIR);
 
-const MODEL_PATH = path.join(DATA_DIR, "model.json")
+const MODEL_PATH = path.join(DATA_DIR, "model.json");
 
 // ====== UTILIDADES ======
 function carregarJSON(file, defaultObj) {
     if (!fs.existsSync(file)) {
-        fs.writeFileSync(file, JSON.stringify(defaultObj, null, 2))
-        return defaultObj
+        fs.writeFileSync(file, JSON.stringify(defaultObj, null, 2));
+        return defaultObj;
     }
     try {
-        return JSON.parse(fs.readFileSync(file))
+        return JSON.parse(fs.readFileSync(file));
     } catch (e) {
-        return defaultObj
+        return defaultObj;
     }
 }
 
 function salvarJSON(file, obj) {
-    fs.writeFileSync(file, JSON.stringify(obj, null, 2))
+    fs.writeFileSync(file, JSON.stringify(obj, null, 2));
 }
 
 function tokenizar(texto) {
@@ -36,59 +36,42 @@ function tokenizar(texto) {
         .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentos
         .replace(/[^\w\s]/g, "")
         .split(/\s+/)
-        .filter(t => t.length > 0)
+        .filter(t => t.length > 0);
 }
 
-function sigmoid(x) {
-    return 1 / (1 + Math.exp(-x))
-}
-
-// ====== MODELO IA ======
-function construirIA(treinamento) {
-    const palavras = [...new Set(treinamento.flatMap(t => tokenizar(t.frase)))]
-    const vetorizar = frase => {
-        const tokens = tokenizar(frase)
-        return palavras.map(p => tokens.includes(p) ? 1 : 0)
-    }
-    
-    let pesos = {}
-    treinamento.forEach(ex => {
-        const vetor = vetorizar(ex.frase)
-        if (!pesos[ex.categoria]) pesos[ex.categoria] = new Array(palavras.length).fill(0)
-        vetor.forEach((v, i) => { if (v === 1) pesos[ex.categoria][i]++ })
-    })
-    return { palavras, vetorizar, pesos }
-}
-
+// ====== LÓGICA DA IA ======
 function prever(treinamento, frase) {
-    if (!treinamento || treinamento.length === 0) return { intencao: "desconhecido", confianca: 0 }
+    if (!treinamento || treinamento.length === 0) return { intencao: "desconhecido", confianca: 0 };
     
-    const ia = construirIA(treinamento)
-    const entrada = ia.vetorizar(frase)
-    let melhor = "desconhecido", scoreMax = -1
+    const tokensAlvo = tokenizar(frase);
+    let melhorCat = "desconhecido";
+    let maxPontos = 0;
 
-    for (let cat in ia.pesos) {
-        const score = entrada.reduce((acc, v, i) => acc + (v * ia.pesos[cat][i]), 0)
-        if (score > scoreMax) {
-            scoreMax = score
-            melhor = cat
+    treinamento.forEach(ex => {
+        const tokensEx = tokenizar(ex.frase);
+        const pontos = tokensAlvo.filter(t => tokensEx.includes(t)).length;
+        if (pontos > maxPontos) {
+            maxPontos = pontos;
+            melhorCat = ex.categoria;
         }
-    }
+    });
 
-    const confianca = scoreMax > 0 ? (sigmoid(scoreMax) * 100).toFixed(2) : 0
-    return { intencao: melhor, confianca }
+    // Cálculo simples de confiança baseado na quantidade de palavras que batem
+    const confianca = maxPontos > 0 ? Math.min((maxPontos / tokensAlvo.length) * 100, 100).toFixed(2) : 0;
+    
+    return { intencao: melhorCat, confianca };
 }
 
-// ====== PESQUISA WEB (API WIKIPEDIA ESTÁVEL) ======
+// ====== MOTOR DE BUSCA (ASK.COM SCRAPER) ======
 async function pesquisarWeb(query) {
     return new Promise((resolve) => {
-        // Usamos a API em português da Wikipedia. Ela retorna JSON limpo e nunca bloqueia.
         const options = {
-            hostname: 'pt.wikipedia.org',
-            path: `/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&utf8=&format=json`,
+            hostname: 'www.ask.com',
+            path: `/web?q=${encodeURIComponent(query)}`,
             method: 'GET',
             headers: {
-                'User-Agent': 'IA-Engine-Bot/1.0 (Node.js)'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept-Language': 'pt-BR,pt;q=0.9'
             }
         };
 
@@ -96,111 +79,113 @@ async function pesquisarWeb(query) {
             let data = "";
             res.on("data", chunk => data += chunk);
             res.on("end", () => {
-                try {
-                    const json = JSON.parse(data);
-                    
-                    // Verifica se a busca trouxe resultados
-                    if (json.query && json.query.search && json.query.search.length > 0) {
-                        const titulo = json.query.search[0].title;
-                        // O 'snippet' vem com marcações HTML (ex: <span>), então limpamos elas
-                        let resumo = json.query.search[0].snippet.replace(/<[^>]+>/g, "");
-                        
-                        // Retorna de forma amigável
-                        resolve(`Segundo a Wikipédia sobre "${titulo}": ${resumo}...`);
-                    } else {
-                        resolve("Não encontrei informações factuais sobre isso na minha base de dados da enciclopédia.");
-                    }
-                } catch (e) {
-                    resolve("Busca concluída, mas não consegui ler o formato dos dados.");
+                // Regex para capturar o "Abstract" ou "Snippet" dos resultados
+                // Tenta encontrar parágrafos de descrição ou spans com texto longo
+                const regexSnippet = /<p class="[^"]*abstract[^"]*">([\s\S]*?)<\/p>|<div class="[^"]*snippet[^"]*">([\s\S]*?)<\/div>|<span>([^<]{60,300})<\/span>/gi;
+                
+                let match;
+                let snippets = [];
+                
+                while ((match = regexSnippet.exec(data)) !== null) {
+                    let texto = (match[1] || match[2] || match[3]).replace(/<[^>]+>/g, "").trim();
+                    if (texto.length > 40) snippets.push(texto);
+                }
+
+                if (snippets.length > 0) {
+                    resolve(snippets[0]); // Retorna o primeiro resumo relevante
+                } else {
+                    resolve("Não encontrei uma resposta direta na internet para isso.");
                 }
             });
         });
 
-        req.on("error", () => resolve("Sem conexão de rede no momento."));
-        req.setTimeout(5000, () => { req.destroy(); resolve("A pesquisa excedeu o tempo limite."); });
+        req.on("error", () => resolve("Erro de conexão ao buscar na web."));
+        req.setTimeout(6000, () => { req.destroy(); resolve("A busca na internet demorou demais."); });
     });
 }
 
-// ====== LÓGICA DE RESPOSTA ======
+// ====== LÓGICA DE DECISÃO ======
 async function obterResposta(modelo, frase, pred) {
-    // 1. Se a confiança for alta e houver resposta treinada, usa ela
-    if (parseFloat(pred.confianca) > 70 && modelo.respostas && modelo.respostas[pred.intencao]) {
-        return modelo.respostas[pred.intencao]["__default"] || "Sem resposta padrão.";
+    // Se a IA tiver confiança alta (> 50%) e houver resposta treinada
+    if (parseFloat(pred.confianca) >= 50 && modelo.respostas && modelo.respostas[pred.intencao]) {
+        return modelo.respostas[pred.intencao]["__default"] || "Intenção detectada, mas sem resposta definida.";
     }
 
-    // 2. Fallback: Pesquisa na Wikipedia
-    return await pesquisarWeb(frase)
+    // Caso contrário, busca na internet
+    console.log(`[Busca] Baixa confiança (${pred.confianca}%). Pesquisando: "${frase}"`);
+    return await pesquisarWeb(frase);
 }
 
-// ====== SERVIDOR ======
+// ====== SERVIDOR HTTP ======
 const server = http.createServer((req, res) => {
-    // Rota Frontend
+    // Rota Frontend: Serve o index.html da pasta /public
     if (req.method === "GET" && !req.url.startsWith("/api")) {
-        let file = req.url === "/" ? "index.html" : req.url
-        const filePath = path.join(PUBLIC_DIR, file)
+        let file = req.url === "/" ? "index.html" : req.url;
+        const filePath = path.join(PUBLIC_DIR, file);
         
         fs.readFile(filePath, (err, data) => {
             if (err) {
-                res.writeHead(404)
-                res.end("Crie a pasta 'public' e coloque o seu 'index.html' nela.")
-                return
+                res.writeHead(404);
+                res.end("Arquivo nao encontrado. Certifique-se que o index.html esta na pasta /public");
+                return;
             }
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" })
-            res.end(data)
-        })
-        return
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(data);
+        });
+        return;
     }
 
     // API: Treinar
     if (req.method === "POST" && req.url === "/api/train") {
-        let body = ""
-        req.on("data", chunk => body += chunk)
+        let body = "";
+        req.on("data", chunk => body += chunk);
         req.on("end", () => {
             try {
-                const { frase, categoria, resposta } = JSON.parse(body)
-                const modelo = carregarJSON(MODEL_PATH, { treinamento: [], respostas: {} })
+                const { frase, categoria, resposta } = JSON.parse(body);
+                const modelo = carregarJSON(MODEL_PATH, { treinamento: [], respostas: {} });
                 
-                modelo.treinamento.push({ frase, categoria })
+                modelo.treinamento.push({ frase, categoria });
                 if (resposta) {
-                    if (!modelo.respostas[categoria]) modelo.respostas[categoria] = {}
-                    modelo.respostas[categoria]["__default"] = resposta
+                    if (!modelo.respostas[categoria]) modelo.respostas[categoria] = {};
+                    modelo.respostas[categoria]["__default"] = resposta;
                 }
                 
-                salvarJSON(MODEL_PATH, modelo)
-                res.writeHead(200, { "Content-Type": "application/json" })
-                res.end(JSON.stringify({ status: "Treinado" }))
+                salvarJSON(MODEL_PATH, modelo);
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ status: "Treinado" }));
             } catch (e) {
-                res.writeHead(400); res.end("Erro no JSON")
+                res.writeHead(400); res.end("Erro no JSON");
             }
-        })
+        });
     }
 
-    // API: Testar
+    // API: Testar / Perguntar
     if (req.method === "POST" && req.url === "/api/test") {
-        let body = ""
-        req.on("data", chunk => body += chunk)
+        let body = "";
+        req.on("data", chunk => body += chunk);
         req.on("end", async () => {
             try {
-                const { frase, modo } = JSON.parse(body)
-                const modelo = carregarJSON(MODEL_PATH, { treinamento: [], respostas: {} })
+                const { frase, modo } = JSON.parse(body);
+                const modelo = carregarJSON(MODEL_PATH, { treinamento: [], respostas: {} });
                 
-                const pred = prever(modelo.treinamento, frase)
+                const pred = prever(modelo.treinamento, frase);
                 
                 if (modo === "resposta") {
-                    pred.resposta = await obterResposta(modelo, frase, pred)
+                    pred.resposta = await obterResposta(modelo, frase, pred);
                 }
                 
-                res.writeHead(200, { "Content-Type": "application/json" })
-                res.end(JSON.stringify(pred))
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify(pred));
             } catch (e) {
-                res.writeHead(500); res.end(JSON.stringify({ error: "Erro no processamento" }))
+                res.writeHead(500); res.end(JSON.stringify({ error: "Erro interno" }));
             }
-        })
+        });
     }
-})
+});
 
 server.listen(PORT, () => {
-    console.log(`\n🚀 IA Engine Online!`)
-    console.log(`🔗 http://localhost:${PORT}`)
-    console.log(`📁 Certifique-se de que o index.html está em: ${PUBLIC_DIR}\n`)
-})
+    console.log(`\n=========================================`);
+    console.log(`🧠 IA ENGINE AVANÇADA - ONLINE`);
+    console.log(`🔗 URL: http://localhost:${PORT}`);
+    console.log(`=========================================\n`);
+});
